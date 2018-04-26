@@ -7,7 +7,7 @@ output: html_document
 
 *This forecast is generated from publicly available data on PTAGIS.org, Columbia Basin Research DART, and from US Fish and Wildlife Service.*
 
-PIT tags are used throughout the Columbia River Basin to track migratory fish behavior. This tool can be used to track run timing and forecast salmon escapement as fish begin to migrate up river. Based on initial tagging rates reported by Leavenworth National Fish Hatchery (LNFH) we can expand the observed counts at Bonneville Dam to forecast returns to Icicle Creek up to four weeks in advance of their arrival at Icicle Creek. This advanced notice can be used to inform harvest decisions and anticipate broodstock needs for LNFH. The forecast follows the model $$ N = (B * C) / P $$ where $B$ is the PIT count at Bonneville dam, $C$ is survival rate between Bonneville and Icicle Creek mouth (conversion rate), and $P$ is the proportion of run completed based on historical run timing characteristics (Columbia Basin DART, 2018). The conversion rate is estimated using PIT interrogation data at the ICL array in lower Icicle Creek and Bonneville dam. The ICL antenna was found to be 87% efficient at detecting migrating adults which was acounted for in calculating $C$ Bonneville dam counts are separated by brood year so that unique PIT tagging rates for each cohort can be applied. 
+PIT tags are used throughout the Columbia River Basin to track migratory fish behavior. This tool can be used to track run timing and forecast salmon escapement as fish begin to migrate up river. Based on initial tagging rates reported by Leavenworth National Fish Hatchery (LNFH) we can expand the observed counts at Bonneville Dam to forecast returns to Icicle Creek up to four weeks in advance of their arrival at Icicle Creek. This advanced notice can be used to inform harvest decisions and anticipate broodstock needs for LNFH. The forecast follows the model $$ N = (B * C) / P $$ where $B$ is the PIT count at Bonneville dam, $C$ is survival rate between Bonneville and Icicle Creek mouth (conversion rate), and $P$ is the proportion of run completed based on historical run timing characteristics (Columbia Basin DART, 2018). The conversion rate is estimated using PIT interrogation data at the ICL array in lower Icicle Creek and Bonneville dam. The ICL antenna was found to be 87% efficient at detecting migrating adults which was acounted for in calculating $C$ Bonneville dam counts are separated by brood year so that unique tagging rates for each cohort can be applied. 
 
 ```{r setup, include=FALSE, warning=FALSE}
 # Load libraries and import PTAGIS dataset
@@ -91,44 +91,39 @@ dart <- read.csv(migration_filepath)
 dart <- dart[,1:10]
 
 
-if (format(Sys.Date(), "%j") <= format(as.Date(dart[2,3], format="%m/%d"), "%j")) {
-  percent_run <- 0.05
+if (format(Sys.Date(), "%j") < format(as.Date(dart[2,3], format="%m/%d"), "%j")) {
+  percent_run <- 0
   } else if (format(Sys.Date(), "%j") > format(as.Date(dart[2,3], format="%m/%d"), "%j") &
          format(Sys.Date(), "%j") <= format(as.Date(dart[2,4], format="%m/%d"), "%j")){
-    percent_run <- 0.10
+    percent_run <- 0.05
   } else if (format(Sys.Date(), "%j") > format(as.Date(dart[2,4], format="%m/%d"), "%j") &
          format(Sys.Date(), "%j") <= format(as.Date(dart[2,5], format="%m/%d"), "%j")){
-    percent_run <- 0.25
+    percent_run <- 0.10
   } else if (format(Sys.Date(), "%j") > format(as.Date(dart[2,5], format="%m/%d"), "%j") &
          format(Sys.Date(), "%j") <= format(as.Date(dart[2,6], format="%m/%d"), "%j")) {
-    percent_run <- 0.50
+    percent_run <- 0.25
   } else if (format(Sys.Date(), "%j") > format(as.Date(dart[2,6], format="%m/%d"), "%j") &
          format(Sys.Date(), "%j") <= format(as.Date(dart[2,7], format="%m/%d"), "%j")) {
-    percent_run <- 0.75
+    percent_run <- 0.5
   } else if (format(Sys.Date(), "%j") > format(as.Date(dart[2,7], format="%m/%d"), "%j") &
          format(Sys.Date(), "%j") <= format(as.Date(dart[2,8], format="%m/%d"), "%j")) {
-    percent_run <- 0.90
+    percent_run <- 0.75
   } else if (format(Sys.Date(), "%j") > format(as.Date(dart[2,8], format="%m/%d"), "%j") &
          format(Sys.Date(), "%j") <= format(as.Date(dart[2,9], format="%m/%d"), "%j")) {
+    percent_run <- 0.90
+  } else if (format(Sys.Date(), "%j") > format(as.Date(dart[2,9], format="%m/%d"), "%j") &
+         format(Sys.Date(), "%j") <= format(as.Date(dart[2,10], format="%m/%d"), "%j")) {
     percent_run <- 0.95
   } else percent_run <- 1 
 
 ```
 ### `r if (sum(current_year$"Expanded Migration Size") * conversion_rate / percent_run  < 1 ){
-  "No PIT tags have been detected yet. Hopefully, fish come back this year!"
+  "No PIT tags have been detected yet. Hopefully, fish are still on their way!"
 } else {
   paste("Forecast to Icicle Creek:", sum(current_year$"Expanded Migration Size") * conversion_rate / percent_run)
 }`
 
-Based on historical run timing characteristics the Icicle Creek spring Chinook run is `r paste((percent_run * 100), "%", sep = "")` (Columbia Basin Research DART 2018). Run timing characteristics are shown in Table 2. The average run timing may not closely represent this year's run. The run typically arrives later in high water years and earlier in low water years. In 2018 we observed slightly above average snowpack and may expect higher flows through the hydrosystem indicating a later return.  
-
-```{r echo = FALSE}
-dart %>% 
-  kable("html",caption = "Table 2. Migration Timing Characteristics (Columbia Basin Research DART, 2018)", 
-        align = "c", 
-        col.names = c("Year", "First", "5% Passage", "10% Passage", "25% Passage", "50% Passage", "75% Passage", "90% Passage", "95% Passage", "Last")) %>% 
-  kable_styling(bootstrap_options = c("striped", "hover", "condensed"), full_width = F, position = "left")
-```
+Based on historical run timing characteristics the Icicle Creek spring Chinook run is `r paste((percent_run * 100), "%", sep = "")` complete (Columbia Basin Research DART 2018). Run timing characteristics are shown in Table 2. The average run timing may not closely represent this year's run. For instance, the run typically arrives later in high water years and earlier in low water years. In 2018 we observed slightly above average snowpack and may expect higher flows through the hydrosystem indicating a later return.  
 
 The following data shows the methods used to develop this forecast. Conversion rate, C, is calculated by Table 3. and represents the average survival of adults between Bonneville Dam and Lower Icicle Creek (ICL).The ICL array was installed in 2011 and available data includes 2012 to present.
 
@@ -174,11 +169,24 @@ kable("html",caption = "Table 4. Comparison of PIT expansion method and actual r
   kable_styling(bootstrap_options = c("striped", "hover", "condensed"), full_width = F, position = "left")
 ```
 
-Table 4 shows the tendency of this forecast to under predict by an average `r paste(round(mean( predicted$'Percent Diff' ), 1), "%" , sep = "")`. This may be explained by research showing that PIT tagged fish have lower smolt to adult return rates (Knudsen, 2009, McDonald et al 2003, Prentice 1994) which would result in a slumping PIT ratio. We see a much larger deviation in 2015 where we had record high air and water temperatures. This was also one of the lowest water years in history for Icicle Creek. The exact cause is not known but explanations could include and increase in out of basin strays to Icicle Creek, reduced angling effort, or unsuccessful angling.
+Table 4 shows the tendency of this forecast to under predict by an average `r paste(round(mean( predicted$'Percent Diff' ), 1), "%" , sep = "")`. This may be explained by research showing that PIT tagged fish have lower smolt to adult return rates (Knudsen, 2009, McDonald et al 2003, Prentice 1994). Sliding PIT ratios have been documented at other hatcheries with the Leavenworth Complex as well. We see a much larger deviation in 2015 when Icicle Creek. The exact cause isn't known yet but could be related to record high air and water temperatures in Icicle Creek that year. This was also one of the lowest water years in history for Icicle Creek. Other explanations could include an increase in out of basin strays to Icicle Creek, reduced angling effort, or unsuccessful angling. More research and subsequent year's data may better explain the discrepancy. 
 
 ```{r echo = FALSE}
 ggplot(predicted, aes(x = MigrationYear))+
   geom_line(aes(y = Forecast, color = "Forecast")) +
   geom_line(aes(y = Run, color = "Run"))+
-  ggtitle("Comparison of Run Forecast to Actual Run")
+  ggtitle("Comparison of Run Forecast and Measured Returns")+
+  ylab("Number of Spring Chinook")+
+  ylim(0, NA)+
+  guides(fill=guide_legend(title = NULL))+
+  theme_bw()
+  
+```
+
+```{r echo = FALSE}
+dart %>% 
+  kable("html",caption = "Table 2. Migration Timing Characteristics (Columbia Basin Research DART, 2018)", 
+        align = "c", 
+        col.names = c("Year", "First", "5% Passage", "10% Passage", "25% Passage", "50% Passage", "75% Passage", "90% Passage", "95% Passage", "Last")) %>% 
+  kable_styling(bootstrap_options = c("striped", "hover", "condensed"), full_width = F, position = "left")
 ```
