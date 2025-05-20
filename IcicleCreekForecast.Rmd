@@ -20,60 +20,67 @@ library(stringr)
 library(ggplot2)
 #Import PTAGIS Dataset; Data was queried on PTAGIS for LNFH tagged fish
 # migrating up the mainstem, including overshoots at TUF and RRF.
-ftp_file_path = "ftp://ftp.ptagis.org/MicroStrategyExport/Bednarekuba/icicle_cr_forecast.csv"
-LNFH_Returns <- read.csv(ftp_file_path, fileEncoding = "UTF-16LE")
+#LNFH_IS <- read.csv(ftp_file_path, fileEncoding = "UTF-16LE")
+LNFH_IS <- read.csv(file = "C:/Users/kubab/Downloads/LNFH_PIT_IS.csv", fileEncoding = "UTF-16LE") #temporary code until connection to ptagis is established
 
 #Clean and tidy the resulting table
 #Convert datatypes
-LNFH_Returns$Tag.Code <- as.character(LNFH_Returns$Tag.Code)
-LNFH_Returns$Site.Name <- substr(LNFH_Returns$Site.Name,1,3)
-LNFH_Returns$First.Obs.Date.Max <- mdy(LNFH_Returns$First.Obs.Date.Max)
+LNFH_IS$Tag <- as.character(LNFH_IS$Tag)
+LNFH_IS$Site.Code <- substr(LNFH_IS$Site,1,3)
+LNFH_IS$First.Time <- mdy_hms(LNFH_IS$First.Time)
 # Select useful variables; rename columns to simplify; 
 # mutate new columns "Age", and migration Year
 
-cleanReturns <- LNFH_Returns %>%
-  select(Tag.Code, Site.Name, Brood.Year.YYYY, First.Obs.Date.Max) %>%
-  rename(TagCode = Tag.Code, SiteName = Site.Name, BroodYear = Brood.Year.YYYY,
-         FirstObsDate = First.Obs.Date.Max) %>%
-  mutate(MigrationYear = year(FirstObsDate), Age = MigrationYear - BroodYear) %>%
-  filter(Age > 2 & Age < 7)
+sitegroups <- tibble(
+  Site.Code = c("B2A", "BO1", "BO2", "BO3", "BO4", "MC1", "MC2", "TD1","TD2","JO1", "JO2","PRA"),
+  Group = c("BON", "BON", "BON","BON","BON","MCN","MCN","TDL","TDL","JOD","JOD", "PRA")
+)
 
-#spread Site to get site counts
-site_counts <- cleanReturns %>% 
-  count(MigrationYear, SiteName) %>% 
-  spread(SiteName, n, fill=0) %>% 
+LNFH_returns <- LNFH_IS %>%
+  select(Tag, Site.Code, Brood.Year, First.Time) %>%
+  left_join(sitegroups) %>% 
+  mutate(MigrationYear = year(First.Time), 
+         Age = MigrationYear - Brood.Year, 
+         Site.Code = if_else(!is.na(Group), Group, Site.Code)) %>%
+  filter(Age > 2 & Age < 7) 
+  
+
+#spread Site to get site counts and calculate conversion rate annaully
+site_counts <- LNFH_returns %>% 
+  count(MigrationYear, Site.Code) %>% 
+  spread(Site.Code, n, fill=0) %>% 
   arrange(MigrationYear) %>% 
   filter(MigrationYear > 2011 & MigrationYear < year(Sys.Date())) %>%
-  mutate(ConversionRate = (ICL / 0.87) / BON) #0.87 is the ICL efficiency
+  mutate(ConversionRate = (ICL / 0.87) / BON) #0.87 is the ICL efficiency 
 
-conversion_rate <- mean(site_counts$ConversionRate)
-
+#Do we get a confidence interval here? or later? use t.test to get mean and 95% CI
+conversion_rate <- mean(site_counts$ConversionRate) #re-write and don't use mean conversion - be more accurate
 
 ## Import Pit ratio and clean
 pit_ratios <- read.csv("PITratios.csv") %>%
-  mutate(BroodYear = Release.Year-2) %>%
-  select(BroodYear, Release.Number, X..PIT, PIT.Ratio.Non.Tag.Tag) %>%
+  mutate(Brood.Year = Release.Year-2) %>%
+  select(Brood.Year, Release.Number, X..PIT, PIT.Ratio.Non.Tag.Tag) %>%
   rename(NumberTagged = X..PIT, pit_ratio = PIT.Ratio.Non.Tag.Tag) 
 
-pit_ratios$BroodYear <- as.integer(pit_ratios$BroodYear)
+pit_ratios$Brood.Year <- as.integer(pit_ratios$Brood.Year)
 pit_ratios$Release.Number <- as.integer( gsub(",", "", pit_ratios$Release.Number))
 pit_ratios$NumberTagged <- as.integer( gsub(",","", pit_ratios$NumberTagged))
 ```
 
 ```{r echo = FALSE, warning = FALSE}
-current_BONcounts <- cleanReturns %>% 
-  count(MigrationYear, BroodYear, Age, SiteName) %>% 
-  spread(SiteName, n, fill=0) %>% 
-  select(MigrationYear, BroodYear, Age, BON) %>%
+current_BONcounts <- LNFH_returns %>% 
+  count(MigrationYear, Brood.Year, Age, Site.Code) %>% 
+  spread(Site.Code, n, fill=0) %>% 
+  select(MigrationYear, Brood.Year, Age, BON) %>%
   filter(MigrationYear == year(Sys.Date())) ## replace 2017 with year(Sys.Date())
 
 current_year <- data.frame(Age = as.integer(c(3,4,5)))
 current_year <- current_year %>%
-  mutate(BroodYear = as.integer(year(Sys.Date()))-Age) %>%
-  left_join(select(current_BONcounts, BroodYear, BON), by = "BroodYear" ) %>%
-  left_join(pit_ratios, by = "BroodYear") %>%
+  mutate(Brood.Year = as.integer(year(Sys.Date()))-Age) %>%
+  left_join(select(current_BONcounts, Brood.Year, BON), by = "Brood.Year" ) %>%
+  left_join(pit_ratios, by = "Brood.Year") %>%
   mutate("Expanded Migration Size" = BON * pit_ratio) %>%
-  rename("Brood Year" = BroodYear, "Bonneville Count" = BON, "Number Released" = Release.Number, "Number Tagged" = NumberTagged, "Ratio Released:Tagged" = pit_ratio)%>%
+  rename("Brood Year" = Brood.Year, "Bonneville Count" = BON, "Number Released" = Release.Number, "Number Tagged" = NumberTagged, "Ratio Released:Tagged" = pit_ratio)%>%
 replace_na(list("Bonneville Count" = 0, "Expanded Migration Size" = 0)) 
 
 include = FALSE
@@ -152,12 +159,12 @@ ici_run <- icicle_run_reconstruction %>%
 
 ici_run$Run <- round(ici_run$Run, 0)
 
-predicted <- cleanReturns %>% 
-  count(MigrationYear, BroodYear,SiteName) %>% 
-  spread(SiteName, n, fill=0) %>% 
+predicted <- LNFH_returns %>% 
+  count(MigrationYear, Brood.Year,Site.Code) %>% 
+  spread(Site.Code, n, fill=0) %>% 
   arrange(MigrationYear) %>% 
   filter(MigrationYear > 2011 & MigrationYear < year(Sys.Date())) %>%
-  inner_join(pit_ratios, by = "BroodYear") %>%
+  inner_join(pit_ratios, by = "Brood.Year") %>%
   mutate(Forecast = round(BON*pit_ratio*conversion_rate, 0)) %>%
   group_by(MigrationYear) %>%
   summarize(Forecast = sum(Forecast)) %>%

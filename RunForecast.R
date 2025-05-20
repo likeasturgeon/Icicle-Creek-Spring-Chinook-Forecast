@@ -9,36 +9,35 @@ library(tidyr)
 library(tibble)
 library(XLConnect)
 library(lubridate)
+
+setwd("C:/Users/kubab/Documents/DataProjects/GitHub/Icicle-Creek-Spring-Chinook-Forecast")
 #Import PTAGIS Dataset; Data was queried on PTAGIS for LNFH tagged fish
 # migrating up the mainstem, including overshoots at TUF and RRF.
 # The raw data is a ftp connection updated daily.
 
-
-dataURL <- "ftp://ftp.ptagis.org/MicroStrategyExport/Bednarekuba/LNFH_PIT_IS.csv"
+dataURL <- "C:/Users/kubab/Downloads/LNFH_PIT_IS.csv" # temporary path while connection is fixed
+#dataURL <- "https://api.ptagis.org/reporting/reports/likeasturgeon/file/LNFH_PIT_IS.csv"
 LNFH_Returns <- read.csv(dataURL, 
                          fileEncoding = "UTF-16LE",
                         stringsAsFactors = FALSE)
 
-LNFH_Returns$Release.Date.MMDDYYYY <- as.Date(
-  LNFH_Returns$Release.Date.MMDDYYYY, format = "%M/%d/%Y")
-
-LNFH_Returns$First.Obs.Date.Max <- as.Date(
-  LNFH_Returns$First.Obs.Date.Max, format = "%M/%d/%Y")
-
-LNFH_Returns$Last.Obs.Date.Min <- as.Date(
-  LNFH_Returns$Last.Obs.Date.Min, format = "%M/%d/%Y")
+LNFH_Returns$Release.Date <- mdy(
+  LNFH_Returns$Release.Date.MMDDYYYY, format = "%M/%d/%Y") #
 
 
-#Import Run Reconstruction for past years' comparison
+LNFH_Returns$First.Obs.Date.Max <- ymd(
+  LNFH_Returns$First.Obs.Date.Max)
+
+LNFH_Returns$Last.Obs.Date.Max<- mdy(
+  LNFH_Returns$Last.Obs.Date.Max)
+
+
+#Import Run Reconstruction for pasmdy()#Import Run Reconstruction for past years' comparison
 filepathRun <- "Icicle R  Spring Chinook Run Reconstruction_01092018.xlsx"
-RunReconTble <- readWorksheetFromFile(
-  file = filepathRun,
-  object = "Icicle R  Spring Chinook Run Reconstruction_01092018",
-  sheet = "Icicle Run ReconstructionUpdate",
-  region = 'B4:M23',
-  keep = c("Year", "Run") 
-)
-RunReconTble <- as.tibble(RunReconTble)
+RunReconTble <- read_xlsx(path = filepathRun, 
+                          sheet = "Icicle Run ReconstructionUpdate", 
+                          range = 'B4:M23') %>% 
+  select(Year, Run)
 
 PITratios <- read.csv("PITratios.csv")
 PITratios <- PITratios %>%
@@ -46,11 +45,10 @@ PITratios <- PITratios %>%
   rename(RelYear = Release.Year, Ratio = PIT.Ratio.Non.Tag.Tag)
 
 # Select  most useful fields in PTAGIS query, and add Age column using mutate()
-myReturns <- select(
-  LNFH_Returns, 
-  'Tag.Code', 'Site.Name', 'First.Obs.Date.Max', 'Brood.Year.YYYY', 'Release.Date.MMDDYYYY'
+myReturns <- LNFH_Returns %>% 
+  select(Tag, Site, First.Obs.Date.Max, Brood.Year, Release.Date
   ) %>% mutate(
-    Age = as.integer(format(LNFH_Returns$First.Obs.Date.Max,"%Y")) - `Brood.Year.YYYY` 
+    Age = as.integer(format(LNFH_Returns$First.Obs.Date.Max,"%Y")) - Brood.Year 
   )
 
 #CLEANUP
@@ -73,6 +71,8 @@ pivot <- Adult_migrants %>%
   count(FirstDate, SiteName) %>% 
   spread(SiteName, n, fill=0) %>% 
   arrange(FirstDate) %>% 
+  mutate(BON = BCC+BO1+BO2+BO3+BO4, 
+         MCN = MC1+MC2)%>%
   mutate(GrandTotal=BON+ICL) %>%
   rename(Year = FirstDate)
 
