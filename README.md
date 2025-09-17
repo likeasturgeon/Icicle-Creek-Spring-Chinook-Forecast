@@ -10,5 +10,4 @@ At some point PTAGIS switched from an FTP to an API file delivery. This led to t
 Wishlist items: 
 - Download historical data separately from this years migration data to speed up API download.
 - Confidence intervals on the prediction
-- Streamline some redundant code. This was my first project and looking back on it - it's messy!
-- 
+- Streamline some redundant code for clarity and efficiency. 
